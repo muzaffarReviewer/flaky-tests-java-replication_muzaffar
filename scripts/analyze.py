@@ -51,6 +51,10 @@ def main(indir, outdir):
     df = df[df["status"] != "skip"].copy()
     df["fail"] = df["status"].isin(["fail", "error"]).astype(int)
     df["test_id"] = df["class"].astype(str) + "#" + df["test"].astype(str)
+    # Several test cases can share one name inside a run (repeated/parameterised tests).
+    # Count each test name ONCE per run: it failed in that run if any instance failed.
+    df = (df.groupby(["project", "cpus", "order", "run", "test_id"], as_index=False)
+            .agg(fail=("fail", "max")))
 
     # per test and condition: runs and failures
     g = (df.groupby(["project", "test_id", "cpus", "order"])
