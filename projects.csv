@@ -1,0 +1,5 @@
+name,repo,commit,mvn_args
+java-websocket,TooTallNate/Java-WebSocket,afeacbf8c0f6f6a761c9d9daed8c813dd3b8ed7d,
+commons-exec,apache/commons-exec,5b1e2e42e9c48cbc46ac365441b79f53a50132d2,
+delight-nashorn-sandbox,javadelight/delight-nashorn-sandbox,e9b3ebd48c46ec0843535becadf8b2055676ba42,
+logback-core,qos-ch/logback,6d595bcf5a6dcb34ec6b5d72a5b4dd7534400304,-pl logback-core
