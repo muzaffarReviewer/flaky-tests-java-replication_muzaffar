@@ -7,17 +7,20 @@ on:
         description: "Maximum runs per condition (use 2 for the first smoke test)"
         default: "2"
       budget_minutes:
-        description: "Time budget per condition in minutes (job limit is 360)"
+        description: "Time budget per condition in minutes (job limit is 240)"
         default: "20"
+      projects:
+        description: 'Projects to run, as a JSON list (to re-run one project: ["java-websocket"])'
+        default: '["java-websocket","commons-exec","delight-nashorn-sandbox","logback-core"]'
 
 jobs:
   experiment:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
-        project: [java-websocket, commons-exec, delight-nashorn-sandbox, logback-core]
+        project: ${{ fromJSON(inputs.projects) }}
         cpus: ["4", "1", "0.5"]
         order: [fixed, random]
     steps:
