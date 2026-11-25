@@ -94,6 +94,7 @@ def main(indir, outdir):
     s = s.merge(aff, how="left", on=["project", "cpus", "order"]).fillna({"affected_vs_baseline": 0})
     rt = (runs.groupby(["project", "cpus", "order"])
               .agg(runs_logged=("run", "size"), runs_with_reports=("test_cases", lambda x: int((x > 0).sum())),
+                   timeouts=("mvn_exit", lambda x: int((x == 124).sum())),
                    mean_seconds=("seconds", "mean")).reset_index())
     s = s.merge(rt, how="left", on=["project", "cpus", "order"])
     s["cpus"] = pd.Categorical(s["cpus"], ["4", "1", "0.5"], ordered=True)
