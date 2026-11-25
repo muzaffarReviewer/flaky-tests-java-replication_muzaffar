@@ -1,0 +1,52 @@
+name: flaky-test-experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Maximum runs per condition (use 2 for the first smoke test)"
+        default: "2"
+      budget_minutes:
+        description: "Time budget per condition in minutes (job limit is 360)"
+        default: "20"
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [java-websocket, commons-exec, delight-nashorn-sandbox, logback-core]
+        cpus: ["4", "1", "0.5"]
+        order: [fixed, random]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run condition
+        run: bash scripts/run_condition.sh "${{ matrix.project }}" "${{ matrix.cpus }}" "${{ matrix.order }}" "${{ inputs.runs }}" "${{ inputs.budget_minutes }}"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.project }}-cpu${{ matrix.cpus }}-${{ matrix.order }}
+          path: results/
+
+  analyze:
+    needs: experiment
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: collected
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt tabulate
+      - run: python scripts/analyze.py collected analysis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analysis
+          path: analysis/
