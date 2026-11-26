@@ -29,4 +29,4 @@ To run one condition locally (needs Docker): `bash scripts/run_condition.sh java
 - The number of runs limits which rarely failing tests can be detected.
 
 ## AI-use declaration
-This experiment harness and the analysis scripts were drafted with the help of Claude (Anthropic). The author reviewed the scripts and is responsible for them.
+The author (Muzaffar Yuldoshev, ID 68777) used Claude (Anthropic) to help plan the experiment, write and debug the GitHub Actions workflow and the shell and Python scripts in this repository, analyse the results, and draft the paper. The author ran the experiments, tested the code and checked the reported results, and is responsible for all content.
