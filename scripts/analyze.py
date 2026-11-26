@@ -98,8 +98,11 @@ def main(indir, outdir):
     s = s.merge(aff, how="left", on=["project", "cpus", "order"]).fillna({"affected_vs_baseline": 0})
     rt = (runs.groupby(["project", "cpus", "order"])
               .agg(runs_logged=("run", "size"), runs_with_reports=("test_cases", lambda x: int((x > 0).sum())),
-                   timeouts=("mvn_exit", lambda x: int((x == 124).sum())),
-                   mean_seconds=("seconds", "mean")).reset_index())
+                   timeouts=("mvn_exit", lambda x: int((x == 124).sum()))).reset_index())
+    # mean run time over runs that finished (timed-out runs excluded)
+    sec = (runs[runs["mvn_exit"] != 124].groupby(["project", "cpus", "order"])["seconds"]
+           .mean().rename("mean_seconds").reset_index())
+    rt = rt.merge(sec, how="left", on=["project", "cpus", "order"])
     s = s.merge(rt, how="left", on=["project", "cpus", "order"])
     s["cpus"] = pd.Categorical(s["cpus"], ["4", "1", "0.5"], ordered=True)
     s = s.sort_values(["project", "order", "cpus"])
@@ -107,6 +110,36 @@ def main(indir, outdir):
     with open(os.path.join(outdir, "summary.md"), "w") as f:
         f.write(s.round(1).to_markdown(index=False) if hasattr(s, "to_markdown") else s.to_string(index=False))
     df.to_csv(os.path.join(outdir, "all_tests.csv.gz"), index=False)
+
+    # ---- run-level comparisons with the baseline (Fisher exact, BH-adjusted) ----
+    # (a) share of finished runs in which at least one (non-deterministic) test failed
+    keep = [(p, t) not in always for p, t in zip(df["project"], df["test_id"])]
+    rl = (df[keep].groupby(["project", "cpus", "order", "run"])["fail"].max()
+          .rename("any_fail").reset_index()
+          .groupby(["project", "cpus", "order"])
+          .agg(runs_ok=("any_fail", "size"), runs_with_failure=("any_fail", "sum")).reset_index())
+    # (b) share of started runs that hung and were killed by the timeout (exit 124)
+    hg = (runs.groupby(["project", "cpus", "order"])
+              .agg(runs_started=("run", "size"), runs_hung=("mvn_exit", lambda x: int((x == 124).sum()))).reset_index())
+
+    def vs_baseline(tab, n, k):
+        ps = []
+        for _, r in tab.iterrows():
+            b = tab[(tab["project"] == r["project"]) & (tab["cpus"] == BASELINE[0]) & (tab["order"] == BASELINE[1])]
+            if (r["cpus"], r["order"]) == BASELINE or b.empty:
+                ps.append(float("nan")); continue
+            b = b.iloc[0]
+            ps.append(fisher_exact([[r[k], r[n] - r[k]], [b[k], b[n] - b[k]]])[1])
+        tab = tab.copy()
+        tab["rate"] = tab[k] / tab[n]
+        tab["p"] = ps
+        idx = tab["p"].notna()
+        tab.loc[idx, "p_adj"] = bh_adjust(tab.loc[idx, "p"].tolist())
+        tab["cpus"] = pd.Categorical(tab["cpus"], ["4", "1", "0.5"], ordered=True)
+        return tab.sort_values(["project", "order", "cpus"])
+
+    vs_baseline(rl, "runs_ok", "runs_with_failure").to_csv(os.path.join(outdir, "run_level_failures.csv"), index=False)
+    vs_baseline(hg, "runs_started", "runs_hung").to_csv(os.path.join(outdir, "run_level_hangs.csv"), index=False)
 
     # figure
     piv = s.assign(cond=s["cpus"].astype(str) + " CPU / " + s["order"]).pivot(
